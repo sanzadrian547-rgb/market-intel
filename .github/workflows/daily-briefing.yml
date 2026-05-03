@@ -26,7 +26,11 @@ jobs:
             -H "anthropic-version: 2023-06-01" \
             -H "x-api-key: $ANTHROPIC_API_KEY" \
             -H "Content-Type: application/json" \
-            -d "{\"model\":\"claude-sonnet-4-6\",\"max_tokens\":3000,\"system\":\"Eres analista financiero. Responde SOLO con JSON valido sin backticks ni texto extra. Formato: {\\\"fecha\\\":\\\"string\\\",\\\"generado\\\":\\\"$TODAY\\\",\\\"sentimiento\\\":\\\"mixto\\\",\\\"nivel_riesgo\\\":\\\"Medio\\\",\\\"resumen\\\":\\\"string\\\",\\\"patron\\\":\\\"string\\\",\\\"noticias\\\":[{\\\"titular\\\":\\\"string\\\",\\\"explicacion\\\":\\\"string\\\",\\\"impacto\\\":\\\"Alcista\\\",\\\"activo\\\":\\\"string\\\",\\\"alerta\\\":false}],\\\"acciones\\\":[{\\\"sector\\\":\\\"string\\\",\\\"accion\\\":\\\"MANTENER\\\",\\\"confianza\\\":\\\"Alto\\\",\\\"horizonte\\\":\\\"medio\\\",\\\"motivo\\\":\\\"string\\\"}],\\\"oportunidades\\\":[\\\"string\\\"],\\\"riesgos\\\":[\\\"string\\\"],\\\"priorizar\\\":[\\\"string\\\"],\\\"evitar\\\":[\\\"string\\\"],\\\"senales_vigilar\\\":[\\\"string\\\"]}\",\"messages\":[{\"role\":\"user\",\"content\":\"Hoy es $TODAY. Analiza las noticias financieras mas importantes de hoy y devuelve SOLO el JSON.\"}]}" > raw.json
+            -d '{"model":"claude-sonnet-4-6","max_tokens":2000,"messages":[{"role":"user","content":"Responde SOLO con este JSON exacto sin cambiar nada: {\"fecha\":\"2 mayo 2026\",\"generado\":\"2026-05-02\",\"sentimiento\":\"bullish\",\"nivel_riesgo\":\"Medio\",\"resumen\":\"Mercados al alza hoy.\",\"patron\":\"Test\",\"noticias\":[{\"titular\":\"Test\",\"explicacion\":\"Test\",\"impacto\":\"Alcista\",\"activo\":\"SP500\",\"alerta\":false}],\"acciones\":[{\"sector\":\"Tech\",\"accion\":\"COMPRAR\",\"confianza\":\"Alto\",\"horizonte\":\"medio\",\"motivo\":\"Test\"}],\"oportunidades\":[\"Test\"],\"riesgos\":[\"Test\"],\"priorizar\":[\"Tech\"],\"evitar\":[\"Bonos\"],\"senales_vigilar\":[\"Test\"]}"}]}' > raw.json
+
+          echo "=== RESPUESTA API ==="
+          cat raw.json
+          echo "====================="
 
           python3 - << 'EOF'
 import json, re, sys
@@ -37,7 +41,7 @@ with open('raw.json') as f:
 try:
     resp = json.loads(raw)
 except Exception as e:
-    print("Parse error:", e, raw[:300])
+    print("Parse error:", e)
     sys.exit(1)
 
 if resp.get('type') == 'error':
@@ -47,17 +51,15 @@ if resp.get('type') == 'error':
 text = ''.join(b.get('text','') for b in resp.get('content',[]) if b.get('type')=='text')
 match = re.search(r'\{[\s\S]*\}', text)
 if not match:
-    print("No JSON found:", text[:300])
+    print("No JSON found in:", text[:500])
     sys.exit(1)
 
 parsed = json.loads(match.group(0))
-
 import os
 os.makedirs('docs', exist_ok=True)
 with open('docs/briefing.json', 'w', encoding='utf-8') as f:
     json.dump(parsed, f, ensure_ascii=False, indent=2)
-
-print("OK saved for", parsed.get('generado'))
+print("OK:", parsed.get('generado'))
 EOF
 
       - name: Commit and push
